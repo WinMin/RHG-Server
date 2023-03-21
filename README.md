@@ -13,19 +13,24 @@ RHG-Server is a server-side application that provides an interface for parsing a
 To install and run RHG-Server, follow these steps:
 
 Clone the repository to your local machine.
+
 `git clone https://github.com/WinMin/RHG-Server.git`
 
 Install the required packages.
+
 `pip install -r requirements.txt`
 
 Start the server.
+
 `python3 myserver.py --host 127.0.0.1 --port 5001 --user admin --pass admin --download`
 
 ### Build Docker
 Build the Docker image
+
 `docker build -t rhg-server .`
 
 Start through Docker container
+
 `docker run --rm -p 8080:8080 -v $PWD/chall:/pwn/download --name rhg -it rhg --host 127.0.0.1 --port 5001 --download`
 
 ## Usage
