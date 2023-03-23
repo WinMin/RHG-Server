@@ -19,7 +19,7 @@ def getChallInfo(host, port, user, password):
         print(e)
         return False
     result = json.loads(r.text)
-    print(result)
+    # print(result)
     return result
 
 def resetChallStatus(host, port, user, password, challid):

@@ -1,18 +1,24 @@
 from pywebio.platform.flask import webio_view
 from pywebio.output import *
 from pywebio.pin import *
+from pywebio.session import register_thread
+import pyecharts.options as opts
+from pyecharts.charts import Line
 from flask import Flask
 import argparse
-from threading import Thread
+from threading import Thread, Lock
 import requests
 import os
-
-
+import urllib3
+import datetime
+import time
+import json
 
 import crawl
 import submit
 
 app = Flask(__name__)
+urllib3.disable_warnings()
 
 def put_mainbav():
     put_html("""
@@ -41,12 +47,12 @@ def put_mainbav():
                     <div class="col-12">
                         <div class="d-flex justify-content-between">
                             <div>
-                                <a href="/challenges" class="navbar-brand">
+                                <a href="/?app=challenges" class="navbar-brand">
                                 RHG Server
                                 </a>
-                                <a class="nav-link" href="/challenges">Challenges</a>
-                                <a class="nav-link" href="/scoreboard">Scoreboard</a>
-                                <a class="nav-link" href="/about">About</a>
+                                <a class="nav-link" href="/?app=challenges">Challenges</a>
+                                <a class="nav-link" href="/?app=scoreboard">Scoreboard</a>
+                                <a class="nav-link" href="/?app=about">About</a>
                             </div>
                         </div>
                     </div>
@@ -57,7 +63,8 @@ def put_mainbav():
 
     )
 
-def home():
+@app.route("/")
+def index():
     challenges()
 
 def get_chall_details():
@@ -110,7 +117,7 @@ def show_get_machine_info(challInfo):
             )
 
 def show_challenge_details(chalDetails):
-    print('[+] challID: {}'.format(chalDetails['challengeID']))
+    # print('[+] challID: {}'.format(chalDetails['challengeID']))
     chal = chalDetails
     with use_scope('challenge_details', clear=True):
         popup('题目ID: {}'.format(chal['challengeID']), [
@@ -153,7 +160,6 @@ def show_all_challenge(quest_details, type):
         put_buttons(buttons_list, show_challenge_details)
     )
 
-
 def show_submit_res(data):
     """
     show submit flag result from server
@@ -182,7 +188,6 @@ def show_challenges():
         put_input('FLAG', help_text='Flag')
         put_buttons([dict(label='Submit', value='s', color='dark')], onclick = lambda _: show_submit_res(pin.FLAG))
 
-
 def download(urlParam, IDParam):
     url = urlParam
     challID = IDParam
@@ -201,10 +206,8 @@ def download(urlParam, IDParam):
     except Exception as e:
         print('[-] Download challenge binary error: {}'.format(str(e)))
         return False
-    
 
-
-
+@app.route("/challenges")    
 def challenges():
     put_mainbav()
     try:
@@ -213,25 +216,36 @@ def challenges():
         print('[-] get challenge info error: {}'.format(str(e)))
 
 def show_scoreboard():
-    rank_data = crawl.getRanking(HOST, PORT, USERNAME, PASSWORD)
 
     put_markdown("## Scoreboard")
+    MUTEX.acquire(10)
+    with open("scoreboard.json", "r") as f:
+        data = json.load(f)
+    MUTEX.release()
+    # show scoreboard line
+    c = (
+        Line()
+        .add_xaxis(data["timeline"])
+        .set_global_opts(title_opts=opts.TitleOpts(title="TOP 10 Teams"))
+    )
+    for team in data["teams"]:
+        c.add_yaxis(team, data["teams"][team])
+    c.width = "80%"
+    with use_scope("socreboard_line", clear=True):
+        put_html(c.render_notebook())
+
+    # show scoreboard table
+    rank_data = crawl.getRanking(HOST, PORT, USERNAME, PASSWORD)
     if rank_data:
-        # print line chart
-        # TODO
-       
-       # print form 
         rank_data.sort(key=lambda x: x["rank"])
         table_data = [[d["rank"], d["team_name"], d["total_score"], d["answer_count"]] for d in rank_data]
-
-        print(len(table_data))
         if len(table_data) > 20:
             table_data = table_data[:20]
-        put_table(
-        tdata=table_data,
-        header=["Rank", "Team Name", "Total Score", "Answer Count"],
-    )
 
+        # put_table(tdata)
+        put_table(tdata=table_data, header=["Rank", "Team Name", "Total Score", "Answer Count"])
+
+@app.route("/scoreboard")
 def scoreboard():
     put_mainbav()
     try:
@@ -239,6 +253,42 @@ def scoreboard():
     except Exception as e:
         print('[-] get scoreboard info error: {}'.format(e))
 
+def process_score_data(rank_data, score_data_json):
+
+    rank_data.sort(key=lambda x: x["rank"])
+    if len(rank_data) > 10:
+        rank_data = rank_data[:10]
+    for d in rank_data:
+        score_data_json["teams"][d["team_name"]].append(d["total_score"])
+    now = datetime.datetime.now()
+    score_data_json["timeline"].append(now.strftime("%H:%M"))
+    return score_data_json
+
+def save_scoreboard_data():
+    print("[+] Start save scoreboard data ...")
+    rank_data = crawl.getRanking(HOST, PORT, USERNAME, PASSWORD)
+    if rank_data:
+        score_data_json = {
+            "teams": { d["team_name"]:[] for d in rank_data},
+            "timeline": []
+        }
+    else:
+        raise ValueError("[-] get rank data error !")
+
+    while True:
+        rank_data = crawl.getRanking(HOST, PORT, USERNAME, PASSWORD)
+        if not rank_data:
+            raise ValueError("[-] get rank data error !")
+        score_data_json = process_score_data(rank_data, score_data_json)
+        if score_data_json:
+            MUTEX.acquire(10) # Lock 
+            with open("scoreboard.json", "w") as f:
+                f.write(json.dumps(score_data_json))
+            MUTEX.release() # Unlock  
+
+        time.sleep(ROUND)
+
+@app.route("/about")
 def about():
     put_mainbav()
     put_markdown("## About")
@@ -248,21 +298,21 @@ def about():
     """)
 
 def main():
-    import pywebio
-
     pywebio.config(title='RHG Server')
-    app.add_url_rule('/', 'home', webio_view(home),methods=['GET', 'POST']) 
-    app.add_url_rule('/challenges', 'challenges', webio_view(challenges),methods=['GET', 'POST'])  
-    app.add_url_rule('/scoreboard', 'scoreboard', webio_view(scoreboard),methods=['GET']) 
-    app.add_url_rule('/about', 'about', webio_view(about),methods=['GET'])  
-    app.run(debug=False, host='0.0.0.0', port=8080, threaded=True)
+    t = Thread(target=save_scoreboard_data)
+    t.start()
+    pywebio.platform.flask.start_server([index, challenges, scoreboard, about], port=8080  )
+    
 
 if __name__ == '__main__':
+    import pywebio
+    
     parser = argparse.ArgumentParser(description = 'RHG HTTP Server')
     parser.add_argument('--host', default='172.20.1.11', type=str, help='RHG server address')
     parser.add_argument('--port', default='443', type=str, help='RHG server port')
     parser.add_argument('--user', default='admin', type=str, help='RHG user name')
     parser.add_argument('--pass', default='admin', type=str, help='RHG user password', dest='password')
+    parser.add_argument('--round',default=60, type=int, help='RHG round time (s)')
     parser.add_argument('--download', action='store_true', default=False, help='automatically download attachments to the default download directory')
 
     args = parser.parse_args()
@@ -271,8 +321,9 @@ if __name__ == '__main__':
     USERNAME = args.user
     PASSWORD = args.password
     DOWNLOAD = args.download
+    ROUND    = args.round
+    MUTEX = Lock()
 
-
-    main()
+    main()  
     
 
