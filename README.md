@@ -36,3 +36,6 @@ Start through Docker container
 ## Usage
 
 Once the server is running, you can access the service by using a browser and going to http://localhost:8080.
+
+![image](https://user-images.githubusercontent.com/18380453/230137332-a7550ee3-aef7-49b7-b478-b0a496d9794a.png)
+
