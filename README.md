@@ -41,5 +41,5 @@ Once the server is running, you can access the service by using a browser and go
 
 ## Reference
 
-[官方 API文档]https://mp.weixin.qq.com/s?__biz=Mzg3NTEyOTIyNw==&mid=2247484678&idx=1&sn=cf979bb667aaba5c284fbbd66cabd122&scene=21#wechat_redirect()
+[官方 API文档](https://mp.weixin.qq.com/s?__biz=Mzg3NTEyOTIyNw==&mid=2247484678&idx=1&sn=cf979bb667aaba5c284fbbd66cabd122&scene=21#wechat_redirect)
 
