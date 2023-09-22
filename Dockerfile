@@ -6,7 +6,7 @@ RUN  apt-get clean
 RUN apt update && \
     apt install python3 python3-pip -y
 
-RUN python3 -m pip install flask pywebio pyOpenSSL requests
+RUN python3 -m pip install flask pywebio pyOpenSSL requests pyecharts
 
 RUN mkdir -p /pwn/server
 

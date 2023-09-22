@@ -126,7 +126,8 @@ def show_challenge_details(chalDetails):
                 ['server:', 'nc {} {}'.format(chal['vm_ip'], chal['question_port'])],
                 ['flag  ',  chal['flag_path']],
                 ['solve ',  chal['attacks_count']],   
-                ['attachments:',  put_link('Link', chal['binaryUrl'])]
+                ['attachments:',  put_link('Link', chal['binaryUrl'])],
+                ['question_content', chal['question_content']]
             ]),
                 put_row(
                     [
@@ -156,6 +157,7 @@ def show_all_challenge(quest_details, type):
             download_params = [chal['binaryUrl'] , chal['challengeID']]
             t = Thread(target=download, args=download_params)
             t.start()
+    print(buttons_list)
     put_row(
         put_buttons(buttons_list, show_challenge_details)
     )
@@ -175,12 +177,16 @@ def show_challenges():
     put_markdown('## Challenges Info : ')
     chall_details = get_chall_details()
     if chall_details :
-        put_file('challenge_info.json', str(chall_details).encode('latin'))
+        # put_file('challenge_info.json', str(chall_details))
         chall_details.sort(key = lambda x:x['challengeID']) 
-        put_markdown("### Heap challenge:")
-        show_all_challenge(chall_details, 2) #  challenge type , 1 is stack，2 is heap
         put_markdown("### Stack challenge:")
-        show_all_challenge(chall_details, 1)
+        show_all_challenge(chall_details, '1')
+        put_markdown("### Heap challenge:")
+        show_all_challenge(chall_details, '2') #  challenge type , 1 is stack，2 is heap
+        put_markdown("### Format challenge:")
+        show_all_challenge(chall_details, '3')
+        put_markdown("### Int overflow challenge:")
+        show_all_challenge(chall_details, '4')
 
         put_markdown('---')
         put_markdown('**Submit Flag:** ')
@@ -326,4 +332,5 @@ if __name__ == '__main__':
 
     main()  
     
+
 
